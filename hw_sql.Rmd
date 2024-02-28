@@ -1,0 +1,122 @@
+---
+title: "HW SQL"
+author: "YOUR NAME"
+date: "`r Sys.Date()`"
+output: html_document
+urlcolor: "blue"
+params:
+  solutions: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo       = params$solutions, 
+                      eval       = params$solutions,
+                      fig.align  = "center",
+                      fig.height = 3, 
+                      fig.width  = 5)
+```
+
+**©David Gerard (2023), not to be posted online.**
+
+# Instructions
+
+- Write your solutions in this starter file. You should modify the "author" field in the YAML header.
+- Do not modify the paths of any files.
+- Only commit R Markdown and HTML files (no PDF or Word files). Make sure you have knitted to HTML for your final submission.
+- **Make sure to commit each time you answer a question.** Lack of informative and frequent commits will result in point deductions.
+- Only include the necessary code, not any extraneous code, to answer the questions.
+- Learning objectives:
+    - Basic SQL commands.
+    
+# Lahman Data
+
+Consider the Lahman data on baseball statistics that you can read about here: <http://seanlahman.com/download-baseball-database/>
+
+I have placed a DuckDB database in the "data" folder, along with a data dictionary. Use this data dictionary to understand the variables and tables in this database.
+
+Below, answer all questions using SQL code chunks (except connecting/disconnecting to the database).
+
+1. Create a connection to the Lahman data in the "data" folder.
+
+```{r}
+#install.packages("duckdb")
+```
+
+```{r}
+library(DBI)
+library(duckdb)
+```
+
+```{r}
+con <- dbConnect(duckdb(dbdir = "../data/lahman.duckdb", read_only = TRUE))
+
+```
+
+2. What tables are in this database?
+
+```{sql, connection=con}
+SHOW TABLES;
+```
+
+3. These data end at the end of the 2021 season. Give me a table with all the folks who played in the 2021 season (which started on Apr 1, 2021), but only include their player ID, and their first and last names
+
+```{sql, connection=con}
+SELECT playerID, nameFirst AS firstName, nameLast AS lastName
+FROM People
+WHERE playerID IN (
+    SELECT playerID
+    FROM Batting
+    WHERE yearID = 2021
+    AND G >= 1
+)
+
+
+```
+
+
+4. Display the batting averages (defined as hits divided by at-bats, or `H/AB`), and the associated playerID's, for the 1998 season in Descending order. Only include individuals with at least 50 at-bats.
+
+```{sql, connection=con}
+SELECT playerID, H / NULLIF(AB, 0) AS BattingAverage
+FROM Batting
+WHERE yearID = 1998 AND AB >= 50
+ORDER BY BattingAverage DESC;
+
+ 
+```
+
+
+5. What's the batting average for Barry Bonds in 1998? Use just SQL to get Bonds' playerID and then use that ID to get his AB in 1998. This should only be one SQL call (and you won't get credit if you manually type Bonds' playerID).
+
+```{sql, connection=con}
+SELECT playerID, H / NULLIF(AB, 0) AS BattingAverage
+FROM Batting
+WHERE playerID = 'bondsba01' AND yearID = 1998;
+```
+
+6. Give me the average batting average by year (total hits divided by total at bats).
+```{sql, connection=con}
+ SELECT yearID, SUM(H) / NULLIF(SUM(AB), 0) AS AverageBattingAverage
+FROM Batting
+GROUP BY yearID
+ORDER BY yearID;
+
+```
+
+7. Write the result of the previous query to the output folder as "ba.csv".
+```{sql, connection=con}
+COPY 
+(SELECT yearID, SUM(H) / NULLIF(SUM(AB), 0) AS AverageBattingAverage
+       FROM Batting
+       GROUP BY yearID
+       ORDER BY yearID) 
+       
+TO '../data/ba.csv' (HEADER, DELIMITER ','); 
+```
+
+8. Close your connection.
+
+```{r}
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
